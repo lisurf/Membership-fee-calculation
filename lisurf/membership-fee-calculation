@@ -1,0 +1,246 @@
+DATA = [
+    {
+        "name": "client",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "division_a",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "division_b",
+        "config": {
+            "has_fixed_membership_fee": True,
+            "fixed_membership_fee_amount": 35000,
+        },
+    },
+    {
+        "name": "area_a",
+        "config": {
+            "has_fixed_membership_fee": True,
+            "fixed_membership_fee_amount": 45000,
+        },
+    },
+    {
+        "name": "area_b",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "area_c",
+        "config": {
+            "has_fixed_membership_fee": True,
+            "fixed_membership_fee_amount": 45000,
+        },
+    },
+    {
+        "name": "area_d",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {"name": "branch_a", "config": None},
+    {
+        "name": "branch_b",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_c",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {"name": "branch_d", "config": None},
+    {
+        "name": "branch_e",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_f",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_g",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_h",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_i",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_j",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_k",
+        "config": {
+            "has_fixed_membership_fee": True,
+            "fixed_membership_fee_amount": 25000,
+        },
+    },
+    {
+        "name": "branch_l",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {"name": "branch_m", "config": None},
+    {
+        "name": "branch_n",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_o",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+    {
+        "name": "branch_p",
+        "config": {"has_fixed_membership_fee": False, "fixed_membership_fee_amount": 0},
+    },
+]
+
+
+STRUCTURE = {
+    "client": ["division_a", "division_b"],
+    "division_a": ["area_a", "area_b"],
+    "division_b": ["area_c", "area_d"],
+    "area_a": ["branch_a", "branch_b", "branch_c", "branch_d"],
+    "area_b": ["branch_e", "branch_f", "branch_g", "branch_h"],
+    "area_c": ["branch_i", "branch_j", "branch_k", "branch_l"],
+    "area_d": ["branch_m", "branch_n", "branch_o", "branch_p"],
+}
+
+
+class DATAReader:
+    # Read organization data and unit relationships
+    def __init__(self, data, structure):
+        self.data = data
+        self.structure = structure
+
+    def validate_parent(
+        self, organization: list, organization_unit: "OrganizationUnit", data: dict
+    ):
+        # Return parent of the organization unit
+        parent_name = None
+        for parent, sons in data.items():
+            if organization_unit.name in sons:
+                parent_name = parent
+        for org_unit in organization:
+            if org_unit.name == parent_name:
+                organization_unit.set_parent(org_unit)
+
+    def read(self) -> list:
+        # Load data structures
+        organization_units = []
+        for unit in self.data:
+            name = unit["name"]
+            config_data = unit["config"]
+            config = (
+                OrganisationUnitConfig(
+                    config_data["has_fixed_membership_fee"],
+                    config_data["fixed_membership_fee_amount"],
+                )
+                if config_data
+                else None
+            )
+            organization_units.append(OrganisationUnit(name, config))
+
+        for org_unit in organization_units:
+            self.validate_parent(organization_units, org_unit, self.structure)
+
+        return organization_units
+
+
+class Organization:
+    data: dict = None
+    structure: dict = None
+
+    def __init__(self, data, structure):
+        self.organisation_units = DATAReader(data, structure).read()
+
+    def get_organisation_unit(self, name):
+        if name not in self.organisation_units:
+            raise ValueError("Invalid organisation unit name.")
+        return self.organisation_units[name]
+
+
+class OrganisationUnit:
+    name: str = None
+    config: "OrganisationUnitConfig" = None
+    parent: "OrganisationUnit" = None
+
+    def __init__(self, name: str, config: "OrganisationUnitConfig"):
+        self.name = name
+        self.config = config
+        self.parent = None
+
+    def set_parent(self, parent: "OrganisationUnit"):
+        self.parent = parent
+
+
+class OrganisationUnitConfig:
+    has_fixed_membership_fee: bool = False
+    fixed_membership_fee_amount: int = 0
+
+    def __init__(self, has_fixed_membership_fee, fixed_membership_fee_amount):
+        self.has_fixed_membership_fee = has_fixed_membership_fee
+        self.fixed_membership_fee_amount = fixed_membership_fee_amount
+
+
+def calculate_membership_fee(
+    rent_amount: int,
+    rent_period: str,
+    organisation_unit: str,
+    organization: "Organization",
+):
+    for org_unit in organization.organisation_units:
+        if org_unit.name == organisation_unit:
+            organisation_unit = org_unit
+
+    # Validating input
+    if rent_period not in ["month", "week"]:
+        raise ValueError("Invalid rent period, should be 'month' or 'week'.")
+
+    if rent_period == "week":
+        if rent_amount < 2500 or rent_amount > 200000:
+            raise ValueError("Invalid rent amount, should be £25 - £2,000.")
+
+    else:
+        if rent_amount < 11000 or rent_amount > 866000:
+            raise ValueError("Invalid rent amount, should be £110 - £8,660.")
+
+    # Membership fee calculation
+    vat = 20
+    vat_multiplier = 1 + (vat / 100)
+
+    if organisation_unit.config and organisation_unit.config.has_fixed_membership_fee:
+        membership_fee = organisation_unit.config.fixed_membership_fee_amount / 100
+    else:
+        membership_fee = rent_amount / 100 * vat_multiplier
+        if membership_fee < 12000:
+            membership_fee = 12000 / 100 * vat_multiplier
+
+    if organisation_unit.config and organisation_unit.config.has_fixed_membership_fee:
+        membership_fee = organisation_unit.config.fixed_membership_fee_amount
+    elif organisation_unit.parent:
+        membership_fee = calculate_membership_fee(
+            rent_amount, rent_period, organisation_unit.parent, organization
+        )
+
+    return int(membership_fee)
+
+
+def main():
+    organization = Organization(data=DATA, structure=STRUCTURE)
+    print("Please insert the rent amount:")
+    rent_amount = int(input())
+    print("Please choose the rent period (month or week):")
+    rent_period = input()
+    print("Please choose the organization unit:")
+    organization_unit = input()
+
+    calculated_membership_fee = calculate_membership_fee(
+        rent_amount, rent_period, organization_unit, organization
+    )
+    print(f"The membership fee is {calculated_membership_fee}.")
+
+
+if __name__ == "__main__":
+    main()
